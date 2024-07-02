@@ -48,8 +48,8 @@ func (table *CacheTable) Count() int {
 
 // Foreach all items
 func (table *CacheTable) Foreach(trans func(key interface{}, item *CacheItem)) {
-	table.RLock()
-	defer table.RUnlock()
+	table.Lock() // trans may modify the *item
+	defer table.Unlock()
 
 	for k, v := range table.items {
 		trans(k, v)
@@ -76,7 +76,7 @@ func (table *CacheTable) SetAddedItemCallback(f func(*CacheItem)) {
 	table.addedItem = append(table.addedItem, f)
 }
 
-//AddAddedItemCallback appends a new callback to the addedItem queue
+// AddAddedItemCallback appends a new callback to the addedItem queue
 func (table *CacheTable) AddAddedItemCallback(f func(*CacheItem)) {
 	table.Lock()
 	defer table.Unlock()
@@ -108,7 +108,7 @@ func (table *CacheTable) AddAboutToDeleteItemCallback(f func(*CacheItem)) {
 	table.aboutToDeleteItem = append(table.aboutToDeleteItem, f)
 }
 
-// RemoveAboutToDeleteItemCallback empties the about to delete item callback queue
+// RemoveAboutToDeleteItemCallback empties the AboutToDeleteItem callback queue
 func (table *CacheTable) RemoveAboutToDeleteItemCallback() {
 	table.Lock()
 	defer table.Unlock()
@@ -135,7 +135,7 @@ func (table *CacheTable) expirationCheck() {
 	}
 
 	// To be more accurate with timers, we would need to update 'now' on every
-	// loop iteration. Not sure it's really efficient though.
+	// loop iteration. Not sure if it's really efficient though.
 	now := time.Now()
 	smallestDuration := 0 * time.Second
 	for key, item := range table.items {
@@ -149,7 +149,7 @@ func (table *CacheTable) expirationCheck() {
 			continue
 		}
 		if now.Sub(accessedOn) >= lifeSpan {
-			// Item has excessed its lifespan.
+			// Item has exhausted its lifespan.
 			table.deleteInternal(key)
 		} else {
 			// Find the item chronologically closest to its end-of-lifespan.
@@ -344,18 +344,21 @@ func (table *CacheTable) MostAccessed(count int64) []*CacheItem {
 	}
 	sort.Sort(p)
 
-	var r []*CacheItem
-	c := int64(0)
-	for _, v := range p {
-		if c >= count {
-			break
-		}
+	// count may greater than the table item length
+	if count > int64(len(table.items)) {
+		count = int64(len(table.items))
+	}
 
+	var r = make([]*CacheItem, 0, int(count))
+	for _, v := range p {
 		item, ok := table.items[v.Key]
 		if ok {
 			r = append(r, item)
 		}
-		c++
+
+		if len(r) >= int(count) {
+			break
+		}
 	}
 
 	return r

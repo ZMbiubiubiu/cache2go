@@ -44,12 +44,12 @@ func NewCacheItem(key interface{}, lifeSpan time.Duration, data interface{}) *Ca
 	t := time.Now()
 	return &CacheItem{
 		key:           key,
+		data:          data,
 		lifeSpan:      lifeSpan,
 		createdOn:     t,
 		accessedOn:    t,
 		accessCount:   0,
 		aboutToExpire: nil,
-		data:          data,
 	}
 }
 
@@ -117,7 +117,7 @@ func (item *CacheItem) AddAboutToExpireCallback(f func(interface{})) {
 	item.aboutToExpire = append(item.aboutToExpire, f)
 }
 
-// RemoveAboutToExpireCallback empties the about to expire callback queue
+// RemoveAboutToExpireCallback empties the AboutToExpire callback queue
 func (item *CacheItem) RemoveAboutToExpireCallback() {
 	item.Lock()
 	defer item.Unlock()
